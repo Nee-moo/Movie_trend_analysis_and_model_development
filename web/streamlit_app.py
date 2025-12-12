@@ -15,7 +15,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 data_path = os.path.join(current_dir, '..', 'data', 'processed', 'cleaned_data.csv')
 @st.cache_data
 def load_data():
-    return pd.read_csv("../data/processed/cleaned_data.csv")
+    return pd.read_csv(data_path)
 
 try:
     df = load_data()
