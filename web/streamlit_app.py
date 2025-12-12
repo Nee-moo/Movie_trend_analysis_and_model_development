@@ -254,3 +254,5 @@ st.markdown("---")
 st.title("Dashboard Phân tích Phim 🎬")    
 genres = st.multiselect("🎭 Thể loại (Lọc chung)", options=unique_genres, default=unique_genres[:3])
 countries = st.multiselect("🌐 Quốc gia", options=unique_countries, default=[])
+if genres:
+    filtered_df = filtered_df[filtered_df['Genres'].apply(lambda x: any(g in x for g in genres))]
