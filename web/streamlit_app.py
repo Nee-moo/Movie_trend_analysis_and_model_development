@@ -4,23 +4,22 @@ import plotly.express as px
 import numpy as np 
 import joblib
 
-st.set_page_config(page_title="Movie Dashboard", layout="wide")
-df = pd.read_csv("../data/processed/cleaned_data.csv")
-
-try:
-    model = joblib.load('random_forest_model.joblib')
-    model_columns = joblib.load('model_columns.joblib')
-except FileNotFoundError:
-    st.error("⚠️ Không tìm thấy file mô hình!")
-    st.stop()
-
 st.set_page_config(
     page_title="Movie Revenue Predictor",
     page_icon="🎬",
     layout="wide",
 )
 
-# --- 2. TẢI MÔ HÌNH ---
+@st.cache_data
+def load_data():
+    return pd.read_csv("../data/processed/cleaned_data.csv")
+
+try:
+    df = load_data()
+except FileNotFoundError:
+    st.error("⚠️ Không tìm thấy file dữ liệu cleaned_data.csv")
+    st.stop()
+#  TẢI MÔ HÌNH 
 @st.cache_resource
 def load_model_resources():
     try:
@@ -38,7 +37,7 @@ if model is None:
     st.info("👉 Hãy chạy file `model/random_forest.py` trước để tạo file .joblib")
     st.stop()
 
-# --- 3. GIAO DIỆN NHẬP LIỆU ---
+# nhập dữ liệu
 st.title("🎬 Dự Đoán Doanh Thu Phim")
 st.markdown("---")
 
@@ -51,42 +50,31 @@ with col1:
 with col2:
     vote_count = st.number_input("Lượt bình chọn (Vote Count)", min_value=0, value=5000, step=100)
     
-    # Chỉ tính Social_Buzz (vì có thể bạn có dùng), bỏ qua Vote_Squared và Movie_Age
-    social_buzz = rating * vote_count
 
-# 1. Lấy danh sách Thể loại
-# Máy tính tự tìm các cột bắt đầu bằng "Genre_" và cắt bỏ tiền tố đi để hiển thị cho đẹp
+#  Lấy danh sách Thể loại
 all_genres = [col.replace("Genre_", "") for col in model_columns if col.startswith("Genre_")]
-all_genres.sort() # Sắp xếp A-Z
+all_genres.sort() # Sắp xếp 
 
-# 2. Lấy danh sách Quốc gia
+# Lấy danh sách Quốc gia
 all_countries = [col.replace("Country_", "") for col in model_columns if col.startswith("Country_")]
 all_countries.sort()
 
 selected_genres = st.multiselect("Chọn Thể loại:", all_genres, default=['Action'])
 selected_countries = st.multiselect("Chọn Quốc gia:", all_countries, default=['United States of America'])
 
-# --- 4. DỰ ĐOÁN ---
+#  DỰ ĐOÁN 
 st.markdown("---")
 if st.button("🚀 Dự đoán Doanh thu", type="primary"):
     
-    # BƯỚC 1: Tạo bảng dữ liệu rỗng chuẩn form mẫu (toàn số 0)
     input_data = pd.DataFrame(columns=model_columns)
     input_data.loc[0] = 0 
     
-    # BƯỚC 2: Điền các chỉ số cơ bản
-    # Code tự động kiểm tra: Nếu mô hình CÓ cột đó thì mới điền, KHÔNG thì thôi (tránh lỗi)
     if 'Year' in input_data.columns: input_data['Year'] = year
     if 'Rating' in input_data.columns: input_data['Rating'] = rating
     if 'Vote_Count' in input_data.columns: input_data['Vote_Count'] = vote_count
     
-    # Điền Social Buzz (nếu mô hình của bạn có dùng)
-    if 'Social_Buzz' in input_data.columns: input_data['Social_Buzz'] = social_buzz
-
-    # BƯỚC 3: Điền One-Hot Encoding (Thể loại & Quốc gia)
-    # Tìm cột tên "Genre_Action", nếu có trong mô hình thì bật lên 1
     for g in selected_genres:
-        col_name = f"Genre_{g}"  # Tự động ghép lại tiền tố để tìm cột
+        col_name = f"Genre_{g}"  
         if col_name in input_data.columns:
             input_data[col_name] = 1
             
@@ -95,9 +83,8 @@ if st.button("🚀 Dự đoán Doanh thu", type="primary"):
         if col_name in input_data.columns:
             input_data[col_name] = 1
             
-    # BƯỚC 4: Dự đoán và Đổi tiền
     try:
-        # Dự đoán ra Log
+        # dự đoán(log)
         prediction_log = model.predict(input_data)
         
         # Đổi Log về Tiền thật
@@ -114,14 +101,106 @@ st.markdown("---")
 def get_unique_items(df, column_name):
     all_items = set()
     for item_str in df[column_name].dropna():
-        items_list = [item.strip() for item in str(item_str).split(',') if item.strip()]
+        # 1. Chuyển về chuỗi
+        s = str(item_str)
+        # 2. "Lột" sạch các ký tự rác thường gặp trong CSV (ngoặc vuông, nháy đơn, nháy kép)
+        clean_s = s.replace("[", "").replace("]", "").replace("'", "").replace('"', "")
+        
+        # 3. Tách dấu phẩy và xóa khoảng trắng thừa
+        items_list = [item.strip() for item in clean_s.split(',') if item.strip()]
+        
         all_items.update(items_list)
+        
     return sorted(list(all_items))
-
 unique_genres = get_unique_items(df, "Genres")
 unique_countries = get_unique_items(df, "Production_Countries")
 
+st.title("⚙️ Bộ Lọc Dữ Liệu")
+st.markdown("---")
+    
+genres = st.multiselect("🎭 Thể loại (Lọc chung)", options=unique_genres, default=unique_genres[:3])
+countries = st.multiselect("🌐 Quốc gia", options=unique_countries, default=[])
+    
+year_options = ["Tất cả"] + sorted(df["Year"].dropna().unique().astype(int).tolist())
+year = st.selectbox("🗓️ Năm", options=year_options)
+    
+rating = st.slider("⭐ Điểm đánh giá tối thiểu", 0.0, 10.0, 7.0, 0.1)
+
 filtered_df = df.copy()
+
+if genres: 
+    filtered_df = filtered_df[filtered_df["Genres"].apply(lambda x: any(g.lower() in str(x).lower() for g in genres))]
+if countries: 
+    filtered_df = filtered_df[filtered_df["Production_Countries"].apply(lambda x: any(c.lower() in str(x).lower() for c in countries))]
+if year != "Tất cả":
+    filtered_df = filtered_df[filtered_df["Year"] == int(year)]
+filtered_df = filtered_df[filtered_df["Rating"] >= rating]
+
+#dashboard
+col_m1, col_m2, col_m3 = st.columns(3)
+col_m1.metric("Tổng Phim (Đã Lọc)", f"{len(filtered_df):,}")
+col_m2.metric("Rating Trung bình", f"{filtered_df['Rating'].mean():.2f}" if not filtered_df.empty else "N/A")
+col_m3.metric("Doanh thu TB Toàn cầu", f"${filtered_df['$Worldwide'].mean() / 1e6:,.0f}M" if not filtered_df.empty else "N/A")
+
+st.markdown("---")
+
+if not filtered_df.empty:
+    # Chuẩn bị dữ liệu
+    df_yearly = filtered_df.groupby("Year")["$Worldwide"].sum().reset_index()
+    df_yearly.columns = ['Year', 'Total_Worldwide_Revenue']
+    
+    clean_series = filtered_df['Genres'].astype(str).str.replace(r"[\[\]'\"]", "", regex=True)
+    genre_counts_series = clean_series.dropna().str.split(',').explode().str.strip()
+    # Chỉ đếm những genre nằm trong danh sách lọc (nếu có)
+    if genres:
+        # Bây giờ cả 2 bên đều sạch, so sánh mới khớp được
+        genre_counts = genre_counts_series.loc[genre_counts_series.isin(genres)].value_counts().reset_index()
+    else:
+        genre_counts = genre_counts_series.value_counts().reset_index()
+        
+    genre_counts.columns = ['Genre', 'Total_Movies']
+        
+    df_top_revenue = filtered_df.sort_values(by="$Worldwide", ascending=False).head(10)
+    df_top_vote = filtered_df.sort_values(by="Vote_Count", ascending=False).head(10)
+        
+    # Hàng 1: Biểu đồ line + Bar
+    col_viz1, col_viz2 = st.columns(2)
+    with col_viz1:
+        st.subheader("1. 📈 Doanh thu theo Năm")
+        fig1 = px.line(df_yearly, x='Year', y='Total_Worldwide_Revenue', markers=True)
+        st.plotly_chart(fig1, use_container_width=True)
+
+    with col_viz2:
+        st.subheader("2. 🎭 Số lượng Phim")
+        if not genre_counts.empty:
+            fig2 = px.bar(genre_counts.head(10), x='Total_Movies', y='Genre', orientation='h', color='Total_Movies')
+            fig2.update_layout(yaxis={'categoryorder':'total ascending'}) 
+            st.plotly_chart(fig2, use_container_width=True)
+        else:
+            st.info("Không có dữ liệu thể loại.")
+
+    st.markdown("---") 
+
+    # Hàng 2: Top Revenue + Top Vote
+    col_viz3, col_viz4 = st.columns(2)
+    with col_viz3:
+        st.subheader("3. 💰 Top 10 Doanh thu")
+        fig3 = px.bar(df_top_revenue, x='$Worldwide', y='Title', orientation='h', color='Rating')
+        fig3.update_layout(yaxis={'categoryorder':'total ascending'}) 
+        st.plotly_chart(fig3, use_container_width=True)
+
+    with col_viz4:
+        st.subheader("4. ⭐ Top 10 Vote")
+        fig4 = px.bar(df_top_vote, x='Vote_Count', y='Title', orientation='h', color='Rating')
+        fig4.update_layout(yaxis={'categoryorder':'total ascending'}) 
+        st.plotly_chart(fig4, use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("🎞️ Dữ liệu Chi tiết")
+    st.dataframe(filtered_df[["Title", "Genres", "Year", "Rating", "Production_Countries", "$Worldwide"]], use_container_width=True)
+else:
+    st.warning("Không tìm thấy kết quả nào với các tiêu chí lọc hiện tại.")
+    
     
 st.header("🏆 Xếp hạng Phim (Hệ số 0.0 - 1.0)")
 st.markdown("Chọn trọng số theo thang thập phân. Tổng luôn bằng **1.0**.")
@@ -251,8 +330,3 @@ else:
     
 st.markdown("---")
 
-st.title("Dashboard Phân tích Phim 🎬")    
-genres = st.multiselect("🎭 Thể loại (Lọc chung)", options=unique_genres, default=unique_genres[:3])
-countries = st.multiselect("🌐 Quốc gia", options=unique_countries, default=[])
-if genres:
-    filtered_df = filtered_df[filtered_df['Genres'].apply(lambda x: any(g in x for g in genres))]
