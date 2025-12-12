@@ -23,7 +23,6 @@ except FileNotFoundError:
 @st.cache_resource
 def load_model_resources():
     try:
-        # Load file model và danh sách cột chuẩn
         model = joblib.load('random_forest_model.joblib')
         cols = joblib.load('model_columns.joblib')
         return model, cols
@@ -33,8 +32,8 @@ def load_model_resources():
 model, model_columns = load_model_resources()
 
 if model is None:
-    st.error("⚠️ LỖI: Không tìm thấy file mô hình!")
-    st.info("👉 Hãy chạy file `model/random_forest.py` trước để tạo file .joblib")
+    st.error(" lỗi: Không thấy file mô hình!")
+    st.info(" chạy file `random_forest.py` trước để tạo file .joblib")
     st.stop()
 
 # nhập dữ liệu
@@ -44,13 +43,12 @@ st.markdown("---")
 col1, col2 = st.columns(2)
 
 with col1:
-    year = st.number_input("Năm sản xuất (Year)", min_value=1900, max_value=2030, value=2024)
-    rating = st.slider("Điểm đánh giá (Rating)", 0.0, 10.0, 7.0, step=0.1)
+    year = st.number_input("Năm sản xuất (Year)", min_value=2000, max_value=2030, value=2024)
+    rating = st.slider("Điểm đánh giá (Rating)", 0.0, 10.0, 5.0, step=0.1)
 
 with col2:
     vote_count = st.number_input("Lượt bình chọn (Vote Count)", min_value=0, value=5000, step=100)
     
-
 #  Lấy danh sách Thể loại
 all_genres = [col.replace("Genre_", "") for col in model_columns if col.startswith("Genre_")]
 all_genres.sort() # Sắp xếp 
@@ -84,41 +82,32 @@ if st.button("🚀 Dự đoán Doanh thu", type="primary"):
             input_data[col_name] = 1
             
     try:
-        # dự đoán(log)
-        prediction_log = model.predict(input_data)
-        
-        # Đổi Log về Tiền thật
-        prediction_real = np.expm1(prediction_log)[0]
-        
+        prediction_log = model.predict(input_data) # dự đoán(log)
+        prediction_real = np.expm1(prediction_log)[0] # Đổi Log về Tiền thật
         # Hiển thị kết quả
         st.success(f"💰 Doanh thu dự đoán: **${prediction_real:,.0f}**")
         
     except Exception as e:
-        st.error(f"Có lỗi xảy ra: {e}")
+        st.error(f"Lỗi: {e}")
         
 st.markdown("---")
 
 def get_unique_items(df, column_name):
     all_items = set()
-    for item_str in df[column_name].dropna():
-        # 1. Chuyển về chuỗi
-        s = str(item_str)
-        # 2. "Lột" sạch các ký tự rác thường gặp trong CSV (ngoặc vuông, nháy đơn, nháy kép)
-        clean_s = s.replace("[", "").replace("]", "").replace("'", "").replace('"', "")
-        
-        # 3. Tách dấu phẩy và xóa khoảng trắng thừa
-        items_list = [item.strip() for item in clean_s.split(',') if item.strip()]
-        
-        all_items.update(items_list)
-        
+    for item_str in df[column_name].dropna():       
+        s = str(item_str) #  Chuyển về chuỗi   
+        clean_s = s.replace("[", "").replace("]", "").replace("'", "").replace('"', "") #  Xóa dấu ngoặc và dấu nháy 
+        items_list = [item.strip() for item in clean_s.split(',') if item.strip()] #  Tách và loại bỏ khoảng trắng  
+        all_items.update(items_list) 
     return sorted(list(all_items))
+
 unique_genres = get_unique_items(df, "Genres")
 unique_countries = get_unique_items(df, "Production_Countries")
 
 st.title("⚙️ Bộ Lọc Dữ Liệu")
 st.markdown("---")
     
-genres = st.multiselect("🎭 Thể loại (Lọc chung)", options=unique_genres, default=unique_genres[:3])
+genres = st.multiselect("🎭 Thể loại ", options=unique_genres, default=unique_genres[:3])
 countries = st.multiselect("🌐 Quốc gia", options=unique_countries, default=[])
     
 year_options = ["Tất cả"] + sorted(df["Year"].dropna().unique().astype(int).tolist())
@@ -145,15 +134,13 @@ col_m3.metric("Doanh thu TB Toàn cầu", f"${filtered_df['$Worldwide'].mean() /
 st.markdown("---")
 
 if not filtered_df.empty:
-    # Chuẩn bị dữ liệu
     df_yearly = filtered_df.groupby("Year")["$Worldwide"].sum().reset_index()
     df_yearly.columns = ['Year', 'Total_Worldwide_Revenue']
     
     clean_series = filtered_df['Genres'].astype(str).str.replace(r"[\[\]'\"]", "", regex=True)
     genre_counts_series = clean_series.dropna().str.split(',').explode().str.strip()
-    # Chỉ đếm những genre nằm trong danh sách lọc (nếu có)
+
     if genres:
-        # Bây giờ cả 2 bên đều sạch, so sánh mới khớp được
         genre_counts = genre_counts_series.loc[genre_counts_series.isin(genres)].value_counts().reset_index()
     else:
         genre_counts = genre_counts_series.value_counts().reset_index()
@@ -202,15 +189,14 @@ else:
     st.warning("Không tìm thấy kết quả nào với các tiêu chí lọc hiện tại.")
     
     
-st.header("🏆 Xếp hạng Phim (Hệ số 0.0 - 1.0)")
-st.markdown("Chọn trọng số theo thang thập phân. Tổng luôn bằng **1.0**.")
+st.header("🏆 Xếp hạng Phim theo tiêu chí của bạn")
 
 col_control, col_display = st.columns([1, 1])
 
 with col_control:
-    st.subheader("1. Điều chỉnh trọng số")
+    st.subheader("1. Tùy chỉnh mức độ quan trọng theo đánh giá của bạn")
     
-    # --- THANH 1: RATING (0.0 đến 1.0) ---
+    # slider rating
     w_rating = st.slider(
        "⭐ 1. Điểm đánh giá (Rating)", 
         min_value=0.0, 
@@ -219,14 +205,10 @@ with col_control:
         step=0.1,    # Bước nhảy 0.1
         key="slider_rating"
     )
-        
-    # --- THANH 2: DOANH THU ---
     # Tính phần còn lại: 1.0 - w_rating
-    remaining_after_rating = 1.0 - w_rating
-        
-    # Xử lý lỗi làm tròn số học (floating point error)
+    remaining_after_rating = 1.0 - w_rating      
     remaining_after_rating = round(remaining_after_rating, 2)
-        
+    # slider revenue    
     w_revenue = st.slider(
         "💰 2. Doanh thu (Revenue)", 
         min_value=0.0, 
@@ -236,13 +218,12 @@ with col_control:
         key="slider_revenue"
     )
         
-    # --- THANH 3: ĐỘ PHỔ BIẾN ---
+    # Tính phần còn lại cho vote
     w_vote = 1.0 - w_rating - w_revenue
-    w_vote = round(w_vote, 2) # Làm tròn để hiển thị cho đẹp
+    w_vote = round(w_vote, 2) # Làm tròn 2 chữ số
         
     st.write(f"🔥 **3. Độ phổ biến: {w_vote}**")
         
-    # Progress bar nhận giá trị từ 0.0 đến 1.0 nên truyền thẳng w_vote vào
     st.progress(w_vote)
 
 with col_display:
@@ -275,7 +256,7 @@ if not filtered_df.empty:
     df_score['norm_revenue'] = normalize(df_score['$Worldwide'])
     df_score['norm_vote'] = normalize(df_score['Vote_Count'])
 
-    # Tính Final Score (Thang 0-1)
+    # Tính Final Score
     df_score['Final_Score'] = (
         (df_score['norm_rating'] * w_rating) + 
         (df_score['norm_revenue'] * w_revenue) + 
@@ -286,7 +267,7 @@ if not filtered_df.empty:
     df_ranked = df_score.sort_values(by='Final_Score', ascending=False).head(20)
 
     # Biểu đồ đóng góp
-    st.subheader(f"🥇 Top 20 Phim (Thang 0 - 1)")
+    st.subheader(f"🥇 Top 20 Phim ")
         
     df_viz = df_ranked[['Title', 'norm_rating', 'norm_revenue', 'norm_vote', 'Final_Score']].copy()
         
@@ -310,21 +291,6 @@ if not filtered_df.empty:
     )
     st.plotly_chart(fig_rank, use_container_width=True)
 
-    # Bảng chi tiết
-    st.dataframe(
-        df_ranked[['Title', 'Year', 'Rating', '$Worldwide', 'Vote_Count', 'Final_Score']],
-        column_config={
-            "Final_Score": st.column_config.ProgressColumn(
-                "Điểm tổng hợp", 
-                format="%.2f",    
-                min_value=0, 
-                max_value=1       # Max là 1.0
-            ),
-            "$Worldwide": st.column_config.NumberColumn("Doanh thu", format="$%.2f"),
-            "Rating": st.column_config.NumberColumn("Rating gốc", format="%.1f"),
-        },
-        use_container_width=True
-    )
 else:
     st.warning("Không có dữ liệu phim.")
     

@@ -42,41 +42,27 @@ test_r2 = r2_score(y_test, y_test_pred_log)
 train_mae = mean_absolute_error(y_train_real, y_train_pred_real) 
 test_mae = mean_absolute_error(y_test_real, y_test_pred_real)
 
-print(f"\n>> KẾT QUẢ LINEAR REGRESSION:")
-print(f"   Train: R2={train_r2:.4f}, MAE=${train_mae:,.0f}")
-print(f"   Test:  R2={test_r2:.4f}, MAE=${test_mae:,.0f}")
-
-# --- 5. VẼ BIỂU ĐỒ (DÙNG BIẾN REAL VỪA TẠO) ---
 plt.figure(figsize=(12, 6))
-
-# Vẽ chấm Xanh (Train) - Dùng _real
-plt.scatter(y_train_real, y_train_pred_real, color='blue', alpha=0.3, label='Train (Dữ liệu Học)')
-
-# Vẽ chấm Đỏ (Test) - Dùng _real
-plt.scatter(y_test_real, y_test_pred_real, color='red', alpha=0.6, label='Test (Dữ liệu Thi)')
-
-
+plt.scatter(y_train_real, y_train_pred_real, color='blue', alpha=0.3, label='Train')
+plt.scatter(y_test_real, y_test_pred_real, color='red', alpha=0.6, label='Test')
 plt.xlabel('Doanh thu Thực tế ($)')
 plt.ylabel('Doanh thu Dự đoán ($)')
 plt.title('So sánh Thực tế vs Dự đoán (Đơn vị: USD)')
 plt.legend()
-
-# Quan trọng: Giữ dòng này để số không bị biến thành 1e9
 plt.ticklabel_format(style='plain', axis='both') 
 plt.show()
-# --- 6. VẼ BIỂU ĐỒ 2: FEATURE IMPORTANCE (Yếu tố quan trọng) ---
+# vẽ biểu đồ yếu tố quan trọng
 importances = model.feature_importances_
 indices = np.argsort(importances)[-10:] # Lấy top 10 yếu tố
 
 plt.figure(figsize=(10, 6))
-plt.title('Top 10 Yếu tố ảnh hưởng nhất (Random Forest)')
+plt.title('Top 10 Yếu tố ảnh hưởng cao nhất')
 plt.barh(range(len(indices)), importances[indices], color='green', align='center')
 plt.yticks(range(len(indices)), [X.columns[i] for i in indices])
 plt.xlabel('Mức độ quan trọng')
 plt.tight_layout()
 plt.show()
 
-# Chuẩn bị nội dung cần ghi
 log_content = f"""
 ----------------------------------------
 Mô hình:  Random Forest
@@ -84,13 +70,8 @@ Training Metrics          Test Metrics
 R2 score: {train_r2:.4f}          R2 score: {test_r2:.4f}
 MAE: {train_mae:.4f}        MAE: {test_mae:.4f}
 """
-
-# Mở file với chế độ 'a' (Append - Ghi nối tiếp vào đuôi)
-# Nếu file chưa có nó sẽ tự tạo, nếu có rồi nó sẽ ghi tiếp xuống dưới
 with open("accuracies.txt", "a", encoding="utf-8") as f:
     f.write(log_content)
-
-print("Đã ghi kết quả vào file accuracies.txt")
 
 import joblib
 joblib.dump(model, '../web/random_forest_model.joblib')

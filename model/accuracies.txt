@@ -10,3 +10,15 @@ Mô hình:  Random Forest
 Training Metrics          Test Metrics
 R2 score: 0.9363          R2 score: 0.6615
 MAE: 26778352.0512        MAE: 56222312.3320
+
+----------------------------------------
+Mô hình:  Random Forest
+Training Metrics          Test Metrics
+R2 score: 0.9363          R2 score: 0.6615
+MAE: 26778352.0512        MAE: 56222312.3320
+
+----------------------------------------
+Mô hình:  Random Forest
+Training Metrics          Test Metrics
+R2 score: 0.9363          R2 score: 0.6615
+MAE: 26778352.0512        MAE: 56222312.3320
