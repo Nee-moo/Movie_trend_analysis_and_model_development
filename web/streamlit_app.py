@@ -26,10 +26,16 @@ except FileNotFoundError:
 @st.cache_resource
 def load_model_resources():
     try:
-        model = joblib.load('random_forest_model.joblib')
-        cols = joblib.load('model_columns.joblib')
+        model_path = os.path.join(current_dir, 'random_forest_model.joblib')
+        cols_path = os.path.join(current_dir, 'model_columns.joblib')
+        model = joblib.load(model_path)
+        cols = joblib.load(cols_path)
+        
         return model, cols
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        # In ra lỗi cụ thể để dễ debug
+        st.error(f"⚠️ Không tìm thấy file mô hình tại: {current_dir}")
+        st.error(f"Chi tiết: {e}")
         return None, None
 
 model, model_columns = load_model_resources()
